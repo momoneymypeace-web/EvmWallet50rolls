@@ -1,20 +1,21 @@
 name: Build APK
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -22,46 +23,22 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
 
-      - name: Extract Android project
-        shell: bash
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Find APK
         run: |
-          set -e
-
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "No project ZIP found."
-            exit 1
-          fi
-
-          echo "Found project ZIP: $ZIP_FILE"
-
-          mkdir -p .android-project
-          unzip -q "$ZIP_FILE" -d .android-project
-
-          PROJECT_DIR=$(dirname "$(find .android-project -type f -name "settings.gradle" | head -n 1)")
-
-          if [ -z "$PROJECT_DIR" ] || [ "$PROJECT_DIR" = ".android-project" ]; then
-            PROJECT_DIR=".android-project"
-          fi
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project found at: $PROJECT_DIR"
-
-          test -f "$PROJECT_DIR/settings.gradle"
-          test -d "$PROJECT_DIR/app"
-
-      - name: Build APK
-        run: |
-          cd "$PROJECT_DIR"
-          gradle :app:assembleDebug --stacktrace
+          echo "APK files:"
+          find . -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: EvmWallet-debug-apk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          name: app-debug-apk
+          path: |
+            **/build/outputs/apk/debug/*.apk
           if-no-files-found: error
